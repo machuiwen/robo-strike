@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="机器人大作战">
+  <meta name="theme-color" content="#2a5bd7">
+  <meta name="description" content="一个卡通风格的第一人称射击小游戏：打败机器人，收集金币，升级武器。">
+  <title>机器人大作战 Robo Strike</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232a5bd7'/%3E%3Crect x='14' y='16' width='36' height='28' rx='9' fill='%235ec8ff'/%3E%3Crect x='19' y='23' width='26' height='13' rx='6' fill='%230b1020'/%3E%3Ccircle cx='26' cy='29.5' r='3.5' fill='%234ff2ff'/%3E%3Ccircle cx='38' cy='29.5' r='3.5' fill='%234ff2ff'/%3E%3Crect x='30' y='8' width='4' height='9' fill='%23ffd04a'/%3E%3Crect x='20' y='46' width='24' height='8' rx='3' fill='%23ffd04a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="crosshair"><i class="ch ch-t"></i><i class="ch ch-b"></i><i class="ch ch-l"></i><i class="ch ch-r"></i><i class="ch-dot"></i></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="scope" class="hidden"><div class="scope-ring"></div></div>
+    <div class="hud-top">
+      <div class="tag" id="hud-wave">第 1/8 波</div>
+      <div class="tag timer" id="hud-timer">0:00</div>
+      <div class="tag" id="hud-left">剩余 0</div>
+    </div>
+    <div class="hud-tr">
+      <div class="score"><small>得分</small><span id="hud-score">0</span></div>
+      <div class="coins"><b class="coin"></b><span id="hud-coins">0</span></div>
+    </div>
+    <div id="killfeed"></div>
+    <div id="bossbar" class="hidden"><div class="bb-name">首领 · 巨无霸机甲</div><div class="bb-bar"><div id="bb-fill"></div></div></div>
+    <div class="hud-bl">
+      <div class="stat hp"><span class="ico">+</span><span class="num" id="hud-hp">100</span><div class="bar"><div class="fill" id="hp-fill"></div></div></div>
+      <div class="stat ar"><span class="ico">盾</span><span class="num" id="hud-ar">0</span><div class="bar"><div class="fill" id="ar-fill"></div></div></div>
+      <div id="hud-lives"></div>
+    </div>
+    <div class="hud-br">
+      <div id="hud-wname">激光步枪</div>
+      <div class="ammo"><span id="hud-ammo">30</span><span class="sep">/</span><span id="hud-reserve">150</span></div>
+      <div id="hud-reload"><div id="reload-fill"></div></div>
+    </div>
+    <div id="slots"></div>
+    <div id="hint"></div>
+    <div id="center-msg"></div>
+    <div id="coinpop"></div>
+  </div>
+
+  <div id="hurt"></div>
+  <div id="lowhp"></div>
+  <div id="dmgdirs"></div>
+  <div id="toast"></div>
+
+  <div id="touch" class="hidden">
+    <div id="joy"><div id="joy-knob"></div></div>
+    <div class="tb" id="tb-fire" data-b="fire"><span>开火</span></div>
+    <div class="tb" id="tb-jump" data-b="jump"><span>跳</span></div>
+    <div class="tb" id="tb-crouch" data-b="crouch"><span>蹲</span></div>
+    <div class="tb" id="tb-reload" data-b="reload"><span>换弹</span></div>
+    <div class="tb" id="tb-switch" data-b="switch"><span>换枪</span></div>
+    <div class="tb" id="tb-aim" data-b="aim"><span>瞄准</span></div>
+    <div class="tb wide" id="tb-shop" data-b="shop"><span>商店</span></div>
+    <div class="tb wide go" id="tb-go" data-b="go"><span>开始下一波</span></div>
+  </div>
+
+  <div id="topbtns" class="hidden">
+    <button id="btn-pause" aria-label="暂停"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+    <button id="btn-mute" aria-label="声音"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke-width="2"/><path class="x" d="M16 9l6 6M22 9l-6 6" fill="none" stroke-width="2.4"/></svg></button>
+  </div>
+
+  <!-- Title -->
+  <div id="title" class="screen">
+    <div class="panel title-panel">
+      <h1 class="logo"><span class="l1">ROBO</span><span class="l2">STRIKE</span></h1>
+      <div class="subtitle">机器人大作战</div>
+      <div class="diff" id="diff">
+        <button data-diff="easy"><b>简单</b><small>适合小朋友</small></button>
+        <button data-diff="normal"><b>普通</b><small>刚刚好</small></button>
+        <button data-diff="hard"><b>困难</b><small>高手挑战</small></button>
+      </div>
+      <button id="btn-start" class="primary">开始游戏</button>
+      <div class="best">最高分（<span id="best-diff">普通</span>）：<b id="best">0</b></div>
+      <div class="help desktop-only">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动　<kbd>空格</kbd> 跳　<kbd>C</kbd> 蹲</div>
+        <div>鼠标 瞄准　左键 开火　右键 瞄准镜</div>
+        <div><kbd>R</kbd> 换弹　<kbd>1</kbd>-<kbd>5</kbd> / 滚轮 换枪　<kbd>B</kbd> 商店　<kbd>Esc</kbd> 暂停</div>
+      </div>
+      <div class="help touch-only">
+        <div>左边 拖动摇杆 移动　右边 滑动 转视角</div>
+        <div>按「开火」射击，按住开火键还能同时转视角</div>
+      </div>
+      <div class="note">打败机器人和无人机，它们会碎成火花和螺丝！</div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>已暂停</h2>
+      <button id="btn-resume" class="primary">继续游戏</button>
+      <div class="opts">
+        <label class="opt"><span>音乐</span><input type="checkbox" id="opt-music"></label>
+        <label class="opt"><span>声音</span><input type="checkbox" id="opt-sound"></label>
+        <label class="opt"><span>灵敏度</span><input type="range" id="opt-sens" min="0.3" max="2.5" step="0.05"></label>
+      </div>
+      <div class="row">
+        <button id="btn-restart">重新开始</button>
+        <button id="btn-quit">返回主菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shop -->
+  <div id="shop" class="screen hidden">
+    <div class="panel shop-panel">
+      <div class="shop-head">
+        <h2>商店</h2>
+        <div class="shop-coins"><b class="coin"></b><span id="shop-coins">0</span></div>
+        <div class="shop-time" id="shop-time"></div>
+      </div>
+      <div id="shop-items"></div>
+      <div class="row">
+        <button id="btn-shop-close">关闭（B）</button>
+        <button id="btn-next" class="primary">开始下一波（回车）</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over / victory -->
+  <div id="over" class="screen hidden">
+    <div class="panel">
+      <h2 id="over-title">游戏结束</h2>
+      <div id="over-record" class="record hidden">新纪录！</div>
+      <div class="stats" id="over-stats"></div>
+      <div class="row">
+        <button id="btn-again" class="primary">再玩一次</button>
+        <button id="btn-menu">返回主菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading">正在加载…</div>
+  <noscript><div class="screen"><div class="panel">需要开启 JavaScript 才能玩这个游戏。</div></div></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
